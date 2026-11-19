@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Misi Android Studio: Bangun Aplikasi Pertamamu</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0b1620;overflow:hidden;font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+#stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:0 0;background:#12263A;color:#fff;display:flex;flex-direction:column}
+#hd{height:64px;display:flex;align-items:center;gap:24px;padding:0 32px;background:#0b1620;font-size:20px}
+#hd b{flex:1;font-size:22px}
+#mn{flex:1;padding:20px 40px;overflow:hidden;position:relative}
+#ft{height:76px;display:flex;justify-content:space-between;align-items:center;padding:0 40px;background:#0b1620;font-size:20px}
+button{font:inherit;font-size:20px;cursor:pointer;min-height:48px;border-radius:10px;border:2px solid #5a7a98;background:#1c3a54;color:#fff;padding:8px 18px;text-align:left}
+button:hover:not(:disabled){border-color:#F2B84B}
+button:focus-visible,g:focus-visible{outline:3px solid #F2B84B;outline-offset:2px}
+button:disabled{opacity:.5;cursor:default}
+button.ok:disabled,button.bad:disabled{opacity:1}
+.pri{background:#F2B84B;color:#12263A;border-color:#F2B84B;font-weight:700;text-align:center}
+.ok{background:#1F7A52!important;border-color:#1F7A52!important;color:#fff!important}
+.bad{background:#B3261E!important;border-color:#B3261E!important;color:#fff!important}
+h1{font-size:56px;margin:0 0 8px}h2{font-size:30px;margin:0 0 8px}
+p{font-size:22px;line-height:1.4;margin:0 0 10px;max-width:880px}
+ul{font-size:21px;line-height:1.4;margin:0;padding-left:24px}li{margin-bottom:8px}
+.card{background:#1c3a54;border-radius:14px;padding:18px 24px}
+.row{display:flex;gap:28px}.col{flex:1;display:flex;flex-direction:column;gap:10px}
+#fb{min-height:56px;font-size:21px;padding:12px 18px;border-radius:10px;background:#0b1620;margin-top:12px}
+#fb.ok{background:#1F7A52!important}#fb.bad{background:#B3261E!important}
+.slot{font-size:20px;padding:11px 0;border-bottom:1px solid #3d5c78}
+.reg rect{fill:#284560;stroke:#8fb0cc;stroke-width:2;cursor:pointer}.reg text{fill:#fff;pointer-events:none;font-weight:700}
+.reg.sel rect{fill:#F2B84B}.reg.sel text{fill:#12263A}.reg.ok rect{fill:#1F7A52;cursor:default}.reg.ok text{fill:#fff}
+.ovl{position:absolute;inset:0;background:rgba(11,22,32,.93);display:flex;align-items:center;justify-content:center;text-align:center;z-index:5}
+textarea{width:100%;height:80px;font:inherit;font-size:19px;border-radius:8px;border:2px solid #5a7a98;padding:8px;background:#fff;color:#12263A}
+code{font-family:Consolas,monospace;background:#0b1620;padding:2px 8px;border-radius:6px;color:#F2B84B}
+[draggable=true]{cursor:grab}
+</style></head><body>
+<div id="stage"><div id="hd"></div><div id="mn"></div><div id="ft"></div></div>
+<script>
+const E=id=>document.getElementById(id);
+const N=15,LAST=14;
+const S={scr:'cover',done:Array(N).fill(0),sc:Array(N).fill(0),lv:Array(N).fill(3),m:Array(N).fill(null)};
+let ac,mute=false,TI=null;
+const total=()=>S.sc.reduce((a,b)=>a+b,0);
+const scr=i=>i==LAST?'demo':'m'+(i+1);
+const idx=s=>s=='demo'?LAST:(/^m\d+$/.test(s)?+s.slice(1)-1:-1);
+const cur=()=>idx(S.scr);
+function snd(ok){if(mute)return;try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type=ok?'sine':'square';o.frequency.value=ok?660:200;g.gain.value=.07;o.start();o.stop(ac.currentTime+(ok?.15:.25))}catch(e){}}
+function fb(t,c){const f=E('fb');if(f){f.textContent=t;f.className=c||''}}
+function stopT(){if(TI){clearInterval(TI);TI=null}}
+function lose(i){S.lv[i]--;snd(0);hud();if(S.lv[i]<=0){stopT();const d=document.createElement('div');d.className='ovl';d.innerHTML='<div class="card"><h2>Nyawa habis</h2><p>Tenang, setiap developer pernah gagal build. Baca petunjuk dengan teliti lalu coba lagi.</p><button class="pri" id="rt">Ulangi misi</button></div>';E('mn').appendChild(d);E('rt').onclick=()=>{S.lv[i]=3;S.sc[i]=0;S.done[i]=0;S.m[i]=null;go(scr(i))}}}
+
+/* ---------- data bersama ---------- */
+const P=[['Run','Menjalankan aplikasi ke emulator atau HP','run','Toolbar di bagian atas berisi tombol Run.'],
+['Project','Menampilkan struktur folder dan file proyek','pr','Panel di kiri menampilkan folder dan file.'],
+['Editor','Tempat menulis kode dan mengatur tampilan layout','ed','Bagian tengah adalah area kerja utama.'],
+['Device Manager','Membuat dan mengelola perangkat virtual (emulator)','dm','Panel di kanan mengelola perangkat virtual.'],
+['Logcat','Menampilkan log dan pesan error saat aplikasi berjalan','lg','Panel di bawah memuat pesan sistem.']];
+const PERM=[3,0,4,2,1];
+const ST=['Pilih New Project di layar Welcome','Pilih template Empty Activity','Isi nama aplikasi, package, bahasa, dan Minimum SDK','Klik Finish lalu tunggu Gradle sync selesai','Pilih emulator di Device Manager','Klik tombol Run'];
+const EX=['Proyek baru selalu dimulai dari sini.','Template menentukan kerangka awal aplikasi.','Identitas aplikasi harus jelas sebelum dibuat.','Gradle menyusun proyek sebelum bisa dijalankan.','Aplikasi butuh perangkat tujuan untuk berjalan.','Terakhir, jalankan dan lihat hasilnya.'];
+const SH=[3,0,5,2,4,1];
+const Q=[{q:'Klien melapor: aplikasi langsung tertutup (crash) saat tombol Simpan ditekan. Apa langkah pertamamu?',o:['Buka Logcat, filter level Error, lalu cari baris pesan exception','Instal ulang Android Studio','Ganti emulator dengan yang lebih besar'],a:0,e:'Logcat mencatat penyebab crash, jadi baca dulu sebelum mengubah apa pun.'},
+{q:'Logcat menunjuk error pada baris <code>findViewById(R.id.____)</code>. Di layout, ID tombolnya adalah <code>btn_simpan</code>. Isian yang benar?',o:['btnSimpan','btn_simpan','Simpan'],a:1,e:'ID harus sama persis dengan di layout, termasuk huruf dan garis bawah.'},
+{q:'Setelah menambah library di build.gradle, Gradle sync gagal dan tab Build penuh warna merah. Tindakan yang tepat?',o:['Hapus seluruh folder proyek','Abaikan error dan langsung klik Run','Baca pesan di tab Build, perbaiki dependensi, lalu klik Sync Now'],a:2,e:'Pesan di tab Build menunjuk dependensi yang bermasalah. Perbaiki lalu sync ulang.'}];
+const SL=['TextView','EditText','Button','ImageView'];
+const T3=['Judul layar: teks Kasir Koperasi','Kolom untuk mengetik harga barang','Tombol untuk menghitung total','Tempat gambar logo koperasi'];
+const PV3=['<b style="font-size:22px">Kasir Koperasi</b>','<div style="border-bottom:2px solid #12263A;padding:4px 0;color:#5a6b7a">Harga barang</div>','<span style="background:#1F7A52;color:#fff;padding:6px 18px;border-radius:6px">Hitung</span>','<span style="background:#cfe0ee;display:inline-block;width:56px;height:40px;border-radius:6px;text-align:center;line-height:40px">Logo</span>'];
+const HI3=['Judul berupa teks yang hanya ditampilkan.','Pengguna harus bisa mengetik di sini.','Pengguna menekan ini untuk menjalankan aksi.','Ini menampilkan gambar, bukan teks.'];
+
+/* bank soal demo akhir (5 diambil acak dari 12) */
+const D=[
+{q:'Bagian mana yang dipakai untuk membaca pesan error saat aplikasi berjalan?',o:['Project','Editor','Logcat'],a:2,e:'Logcat menampilkan log dan pesan error.'},
+{q:'Apa fungsi Device Manager?',o:['Mengelola perangkat virtual (emulator)','Menulis kode program','Membaca pesan error'],a:0,e:'Device Manager membuat dan mengelola emulator.'},
+{q:'File mana yang memuat daftar Activity dan izin aplikasi?',o:['strings.xml','build.gradle','AndroidManifest.xml'],a:2,e:'Manifest menyimpan identitas, Activity, dan izin aplikasi.'},
+{q:'Untuk apa Gradle sync dilakukan?',o:['Menghapus data emulator','Memuat ulang pengaturan build agar proyek sesuai','Mengganti versi Android di HP'],a:1,e:'Sync menyelaraskan proyek dengan pengaturan build.gradle.'},
+{q:'Minimum SDK menentukan apa?',o:['Versi Android terlama yang bisa menjalankan aplikasi','Ukuran layar aplikasi','Bahasa pemrograman yang dipakai'],a:0,e:'Perangkat dengan Android lebih lama tidak bisa memasang aplikasi.'},
+{q:'Di folder mana file layout tampilan layar disimpan?',o:['res/layout','manifests','Gradle Scripts'],a:0,e:'File XML tampilan layar berada di res/layout.'},
+{q:'Level Logcat mana yang paling tepat untuk mencari penyebab crash?',o:['Verbose','Info','Error'],a:2,e:'Filter Error menyaring pesan kegagalan.'},
+{q:'Package name aplikasi sebaiknya...',o:['Sama dengan aplikasi lain','Unik untuk tiap aplikasi','Dikosongkan'],a:1,e:'Package name adalah identitas unik aplikasi.'},
+{q:'Kata kunci Kotlin mana untuk variabel yang nilainya tidak boleh diubah lagi?',o:['var','fun','val'],a:2,e:'val membuat variabel hanya-baca, var membuat variabel yang bisa diubah.'},
+{q:'Komponen mana yang paling efisien untuk menampilkan daftar panjang yang bisa digulir?',o:['RecyclerView','TextView','Button'],a:0,e:'RecyclerView mendaur ulang baris sehingga tetap ringan.'},
+{q:'Method Activity mana yang dipanggil pertama kali saat Activity dibuat?',o:['onDestroy','onPause','onCreate'],a:2,e:'onCreate dipanggil saat Activity dibuat dan layout dipasang.'},
+{q:'Di berkas mana teks aplikasi sebaiknya disimpan agar mudah diterjemahkan?',o:['strings.xml','AndroidManifest.xml','build.gradle'],a:0,e:'strings.xml menyimpan teks yang dipanggil dengan @string/nama.'}];
+
+/* ---------- daftar 15 tantangan ---------- */
+const MS=[
+{n:'Kenali Ruang Kerjamu',d:'Cocokkan bagian jendela dengan fungsinya.',k:0,ty:'rg'},
+{n:'Mulai Proyek',d:'Urutkan langkah membuat proyek.',k:1,ty:'od',h:'Susun langkah proyek pertama',p:'Klik langkah sesuai urutan yang benar, mulai dari yang paling awal.',f:'Langkah apa yang paling pertama dilakukan?',st:ST,ex:EX,sh:SH,fin:'Aplikasimu berjalan.'},
+{n:'Rancang Layar Kasir',d:'Seret komponen ke layar ponsel.',k:1,ty:'dg',h:'Rancang layar kasir',p:'Seret komponen ke bagian layar yang cocok. Bisa juga klik komponen, lalu klik tempatnya.',it:SL,tg:T3,pv:PV3,hn:HI3,ph:1,sh:[1,3,0,2],fin:'Layar kasir siap dipakai.'},
+{n:'Hubungkan Kode',d:'Lengkapi potongan kode Kotlin.',k:1,ty:'fl',h:'Hubungkan kode',p:'Isi bagian kosong yang menyala kuning dengan kata yang tepat, dari atas ke bawah.',
+ ln:'val tombol = findViewById&lt;Button&gt;(R.id.{0})<br>tombol.{1} { hitungTotal() }<br>val harga = findViewById&lt;EditText&gt;(R.id.{2}).text.{3}()',
+ nt:'Di layout: ID tombol adalah <code>btn_hitung</code>, ID kolom harga adalah <code>edit_harga</code>.',
+ an:['btn_hitung','setOnClickListener','edit_harga','toString'],bk:['setOnClick','edit_harga','toString','btnHitung','setOnClickListener','toInt','btn_hitung','editHarga'],
+ ex:['ID harus sama persis dengan di layout.','Aksi klik dipasang dengan setOnClickListener.','Kolom harga memakai ID edit_harga.','Isi kolom diambil sebagai teks dengan toString().'],fin:'Tombol Hitung kini berfungsi.'},
+{n:'Tiket Bug dari Klien',d:'Putuskan tindakan untuk 3 kasus.',k:2,ty:'sc',h:'Tiket bug dari klien',tm:1,cs:Q},
+{n:'Jelajah Struktur Proyek',d:'Cocokkan berkas dengan isinya.',k:0,ty:'dg',h:'Jelajahi struktur proyek',p:'Seret berkas atau folder ke penjelasan yang cocok. Bisa juga klik berkas, lalu klik tempatnya.',
+ it:['AndroidManifest.xml','res/layout','strings.xml','build.gradle'],
+ tg:['Identitas aplikasi, daftar Activity, dan izin','Berkas XML tampilan tiap layar','Kumpulan teks aplikasi yang mudah diterjemahkan','Versi, Minimum SDK, dan daftar library'],
+ hn:['Berkas ini memberi tahu sistem Android apa saja isi aplikasi.','Folder ini berisi desain layar dalam bentuk XML.','Berkas ini menyimpan teks seperti nama aplikasi dan label.','Berkas ini mengatur proses build dan dependensi.'],sh:[2,0,3,1],fin:'Kamu hafal isi proyek.'},
+{n:'Pilih Layout yang Tepat',d:'Pilih layout untuk 3 kebutuhan layar.',k:2,ty:'sc',h:'Pilih layout yang tepat',cs:[
+ {q:'Halaman login berisi judul, dua kolom isian, dan tombol yang harus tersusun berurutan dari atas ke bawah dengan cara paling sederhana. Layout apa?',o:['FrameLayout, karena semua tumpuk di satu titik','Tiga Activity terpisah','LinearLayout dengan orientation vertical'],a:2,e:'LinearLayout vertikal menyusun komponen berurutan dari atas ke bawah.'},
+ {q:'Tombol Bayar harus selalu menempel di bawah layar dan berada di tengah, apa pun ukuran HP. Cara paling fleksibel?',o:['ConstraintLayout dengan constraint ke bawah dan ke kiri-kanan parent','Margin atas ratusan piksel','Spasi kosong di dalam teks tombol'],a:0,e:'Constraint ke parent menjaga posisi tetap benar di berbagai ukuran layar.'},
+ {q:'Layar daftar barang berisi ratusan baris yang bisa digulir. Komponen yang paling efisien?',o:['Seratus TextView dalam satu LinearLayout','RecyclerView','ImageView'],a:1,e:'RecyclerView mendaur ulang baris sehingga daftar panjang tetap ringan.'}]},
+{n:'Atur Atribut XML',d:'Lengkapi atribut tombol di layout.',k:1,ty:'fl',h:'Atur atribut XML',p:'Isi bagian kosong yang menyala kuning dengan nilai yang tepat, dari atas ke bawah.',
+ ln:'&lt;Button<br>&nbsp;&nbsp;android:id="@+id/{0}"<br>&nbsp;&nbsp;android:layout_width="{1}"<br>&nbsp;&nbsp;android:layout_height="{2}"<br>&nbsp;&nbsp;android:text="@string/{3}" /&gt;',
+ nt:'Tombol selebar layar, setinggi isinya. ID: <code>btn_bayar</code>. Nama teks di strings.xml: <code>label_bayar</code>.',
+ an:['btn_bayar','match_parent','wrap_content','label_bayar'],bk:['wrap_content','btnBayar','label_bayar','match_parent','Bayar','btn_bayar','fill_screen','dp'],
+ ex:['ID harus unik dan sama persis dengan yang dipakai di kode.','match_parent membuat lebar mengikuti layar.','wrap_content membuat tinggi mengikuti isi tombol.','Teks diambil dari strings.xml lewat @string/nama.'],fin:'Tombol Bayar siap dipakai.'},
+{n:'Siklus Hidup Activity',d:'Urutkan method lifecycle Activity.',k:1,ty:'od',h:'Siklus hidup Activity',p:'Klik tahap sesuai urutan dari Activity dibuat sampai dihapus.',f:'Method apa yang pertama kali dipanggil?',
+ st:['onCreate: Activity dibuat dan layout dipasang','onStart: Activity mulai terlihat','onResume: Activity aktif dan bisa disentuh','onPause: Activity kehilangan fokus','onStop: Activity tidak terlihat lagi','onDestroy: Activity dihapus dari memori'],
+ ex:['Activity dibuat dan layout dipasang di sini.','Activity mulai tampil di layar.','Activity berada di depan dan bisa disentuh.','Fokus hilang, tetapi Activity masih tampak sebagian.','Activity sudah tidak terlihat.','Activity dihapus dan sumber dayanya dilepas.'],sh:[2,5,0,4,1,3],fin:'Kamu paham siklus hidup Activity.'},
+{n:'Pindah Layar dengan Intent',d:'Lengkapi kode perpindahan layar.',k:1,ty:'fl',h:'Pindah layar dengan Intent',p:'Isi bagian kosong yang menyala kuning dengan kata yang tepat, dari atas ke bawah.',
+ ln:'val intent = {0}(this, DetailActivity::class.java)<br>intent.{1}("nama_barang", "Pensil")<br>{2}(intent)<br>// di DetailActivity:<br>val nama = intent.{3}("nama_barang")',
+ nt:'Pindah dari MainActivity ke DetailActivity sambil membawa nama barang.',
+ an:['Intent','putExtra','startActivity','getStringExtra'],bk:['startActivity','Intent','getExtra','putExtra','Bundle','openActivity','getStringExtra','sendExtra'],
+ ex:['Intent adalah objek niat untuk berpindah layar.','putExtra menitipkan data untuk layar tujuan.','startActivity menjalankan perpindahan layar.','getStringExtra membaca teks yang dititipkan.'],fin:'Perpindahan layar berhasil.'},
+{n:'Izin dan Manifest',d:'Atasi 3 masalah izin dan manifest.',k:2,ty:'sc',h:'Izin dan Manifest',cs:[
+ {q:'Aplikasi kasir perlu mengirim data ke server lewat internet, tetapi selalu gagal terhubung. Apa yang kurang?',o:['Warna tema aplikasi','Izin INTERNET (uses-permission) di AndroidManifest.xml','Ukuran font yang lebih besar'],a:1,e:'Akses internet wajib dideklarasikan dengan izin INTERNET.'},
+ {q:'Kamu membuat DetailActivity baru, tetapi aplikasi crash dengan pesan ActivityNotFoundException saat layar itu dibuka. Penyebab paling mungkin?',o:['Layout terlalu besar','Emulator kehabisan baterai','Activity belum didaftarkan di AndroidManifest.xml'],a:2,e:'Setiap Activity harus terdaftar di manifest agar bisa dibuka.'},
+ {q:'Aplikasi ingin memakai kamera. Pada Android 6.0 ke atas, apa yang perlu dilakukan selain mendeklarasikan izin di manifest?',o:['Meminta izin saat aplikasi berjalan (runtime permission) dan menangani jika ditolak','Tidak perlu apa-apa lagi','Menghapus izin dari manifest'],a:0,e:'Izin berbahaya seperti kamera harus diminta saat aplikasi berjalan.'}]},
+{n:'Simpan Data Koperasi',d:'Cocokkan cara penyimpanan dengan kebutuhan.',k:0,ty:'dg',h:'Pilih tempat menyimpan data',p:'Seret cara penyimpanan ke kebutuhan yang cocok. Bisa juga klik dulu, lalu klik tempatnya.',
+ it:['SharedPreferences','Room (SQLite)','File internal','Firebase'],
+ tg:['Pengaturan kecil, misalnya nama toko dan mode gelap','Tabel barang dan transaksi yang bisa dicari','Dokumen laporan atau foto struk sebagai berkas','Data yang disinkronkan online antar perangkat'],
+ hn:['Cocok untuk pasangan kunci-nilai yang sederhana.','Cocok untuk data terstruktur dengan banyak baris.','Cocok untuk menyimpan berkas utuh di penyimpanan aplikasi.','Cocok bila data harus tersedia online dan dibagi antar HP.'],sh:[3,1,0,2],fin:'Data koperasi tersimpan rapi.'},
+{n:'Daftar Barang',d:'Urutkan langkah membuat RecyclerView.',k:1,ty:'od',h:'Bangun daftar barang',p:'Klik langkah sesuai urutan yang benar untuk menampilkan daftar dengan RecyclerView.',f:'Apa yang harus ada di layar lebih dulu?',
+ st:['Tambahkan RecyclerView di layout layar','Buat layout satu baris (item_barang.xml)','Buat Adapter dan ViewHolder untuk satu baris','Atur layoutManager pada RecyclerView','Pasang adapter berisi daftar barang'],
+ ex:['RecyclerView harus ada di layar lebih dulu.','Kamu perlu desain satu baris sebelum membuat adapter.','Adapter menghubungkan data dengan tampilan baris.','LayoutManager menentukan susunan daftar.','Terakhir, adapter dipasang agar daftar tampil.'],sh:[3,0,4,2,1],fin:'Daftar barang tampil.'},
+{n:'Tiket Bug Lanjutan',d:'Putuskan tindakan untuk 4 kasus.',k:2,ty:'sc',h:'Tiket bug lanjutan',tm:1,cs:[
+ {q:'Logcat menampilkan NullPointerException: tombol bernilai null saat dipakai. Penyebab paling mungkin?',o:['Emulator terlalu lambat','Warna tombol salah','findViewById dipanggil sebelum setContentView'],a:2,e:'setContentView harus dipanggil dulu agar view tersedia.'},
+ {q:'Di HP berlayar kecil, tombol Bayar terpotong dan tidak terlihat. Layout memakai ukuran tetap 700dp. Perbaikan?',o:['Minta pengguna membeli HP lebih besar','Pakai ukuran fleksibel (match_parent atau constraint) atau ScrollView','Perkecil resolusi emulator'],a:1,e:'Ukuran fleksibel atau ScrollView membuat layout muat di layar kecil.'},
+ {q:'Aplikasi macet beberapa detik saat memuat 5.000 barang dari database di thread utama. Perbaikan yang tepat?',o:['Pindahkan pemuatan ke thread latar (coroutine), lalu tampilkan hasilnya di UI','Tambah animasi loading saja','Ganti nama variabel'],a:0,e:'Pekerjaan berat di thread utama membekukan layar. Pindahkan ke thread latar.'},
+ {q:'Setelah HP diputar (rotate), harga yang sudah diketik hilang. Apa yang tepat?',o:['Larang pengguna memutar HP','Hapus kolom isian','Simpan state dengan ViewModel atau onSaveInstanceState'],a:2,e:'Rotasi membuat Activity dibuat ulang. ViewModel menjaga data tetap ada.'}]},
+{n:'Demo ke Klien',d:'Kuis 5 soal acak dan refleksi.',k:2,ty:'qz'}
+];
+const MX=i=>{const d=MS[i];return d.ty=='rg'?500:d.ty=='od'?d.st.length*100:d.ty=='dg'?d.it.length*100:d.ty=='fl'?d.an.length*100:d.ty=='sc'?d.cs.length*100+(d.tm?180:0):500};
+
+/* ---------- navigasi ---------- */
+function hud(){const i=cur(),mm=i>=0&&i<LAST;
+E('hd').style.display=S.scr=='cover'?'none':'flex';
+E('hd').innerHTML='<b>Misi Android Studio</b><span>'+(mm?'Energi: '+'♥'.repeat(Math.max(0,S.lv[i]))+'♡'.repeat(Math.max(0,3-S.lv[i])):'')+'</span><span>Skor: '+total()+'</span><span>Selesai: '+S.done.filter(x=>x).length+'/'+N+'</span><button id="mt">'+(mute?'Suara mati':'Suara aktif')+'</button><button id="mu">Menu</button>';
+E('mt').onclick=()=>{mute=!mute;hud()};E('mu').onclick=()=>go('menu')}
+function nav(){const s=S.scr,i=cur(),all=S.done.every(x=>x),z=S.done.indexOf(0);
+let pv={guide:'cover',menu:'guide',result:'menu',credit:'result'}[s];if(i>=0)pv='menu';
+let nx={cover:'guide',guide:'menu',menu:all?'result':scr(z),result:'credit'}[s],ok=s!='credit',lb=s=='cover'?'Mulai':'Berikutnya';
+if(i>=0){ok=!!S.done[i];nx=i<LAST?scr(i+1):(all?'result':'menu');if(i==LAST)lb=all?'Lihat hasil':'Ke menu'}
+const mid=i>=0?(i==LAST?'Demo ke klien':'Misi '+(i+1)+' dari 14'):({guide:'Panduan',menu:'Menu tantangan',result:'Evaluasi',credit:'Informasi kreator'}[s]||'');
+E('ft').innerHTML='<button id="pv" '+(pv?'':'style="visibility:hidden"')+'>Kembali</button><span>'+mid+'</span><button class="pri" id="nx" '+(ok?'':'disabled')+'>'+lb+'</button>';
+if(pv)E('pv').onclick=()=>go(pv);E('nx').onclick=()=>nx&&go(nx)}
+function go(s){stopT();S.scr=s;const i=idx(s);if(i>=0)RM(i);else R[s]();hud();nav()}
+
+/* ---------- layar umum ---------- */
+const R={
+cover(){E('mn').innerHTML='<div class="row" style="height:100%;align-items:center"><div class="col" style="flex:1.3;gap:6px"><h1>Misi Android Studio</h1><h2 style="color:#F2B84B;font-size:38px">Bangun Aplikasi Pertamamu</h2><p>Studio Kodeku menerima proyek aplikasi kasir untuk koperasi sekolah. Jadilah developer junior: selesaikan 15 tantangan, dari mengenal alat kerja, merancang layar, menghubungkan kode, sampai membereskan bug sebelum tenggat!</p></div><svg viewBox="0 0 300 440" width="270" height="396" role="img" aria-label="Ilustrasi ponsel Android dengan kode"><rect x="20" y="10" width="260" height="420" rx="36" fill="#1c3a54" stroke="#F2B84B" stroke-width="5"/><rect x="40" y="50" width="220" height="340" rx="14" fill="#0b1620"/><circle cx="150" cy="130" r="44" fill="#1F7A52"/><rect x="60" y="210" width="130" height="14" rx="7" fill="#F2B84B"/><rect x="60" y="240" width="180" height="14" rx="7" fill="#8fb0cc"/><rect x="60" y="270" width="100" height="14" rx="7" fill="#8fb0cc"/><rect x="60" y="320" width="180" height="38" rx="10" fill="#F2B84B"/></svg></div>'},
+guide(){E('mn').innerHTML='<h2>Panduan</h2><div class="row"><div class="card col"><h2 style="font-size:26px">Tujuan belajar</h2><ul><li>Mengenali bagian jendela Android Studio dan struktur proyek.</li><li>Menyusun langkah membuat, menjalankan, dan membangun fitur proyek.</li><li>Merancang layar dan menghubungkannya dengan kode.</li><li>Memahami Activity, Intent, izin, dan penyimpanan data.</li><li>Menemukan penyebab masalah lewat Logcat dan Gradle.</li></ul></div><div class="card col"><h2 style="font-size:26px">Aturan main</h2><ul><li>Ada 14 misi dan satu demo ke klien, jadi total 15 tantangan. Tiap misi punya 3 energi.</li><li>Jawaban benar memberi +100 skor. Jawaban salah mengurangi 1 energi.</li><li>Misi 5 dan Misi 14 punya waktu bonus, jadi ambil keputusan dengan cepat dan tepat.</li><li>Pilih misi bebas lewat Menu. Tombol Berikutnya aktif setelah misi selesai.</li></ul></div></div><p style="margin-top:14px">Mentor Bina menemanimu di studio. Kamu berlatih mengambil keputusan, memecahkan masalah, dan mengatur waktu seperti developer sungguhan.</p>'},
+menu(){E('mn').innerHTML='<h2 style="font-size:26px;margin-bottom:8px">Menu tantangan</h2><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">'+MS.map((m,i)=>'<div class="card col" style="gap:3px;padding:8px 12px"><b style="font-size:15px;color:#F2B84B">'+(i<LAST?'Misi '+(i+1):'Demo')+(S.done[i]?' (skor '+S.sc[i]+')':'')+'</b><div style="font-size:18px;font-weight:700;line-height:1.2;min-height:42px">'+m.n+'</div><div style="font-size:14px;line-height:1.3;min-height:34px">'+m.d+'</div><button class="pri" style="min-height:38px;padding:4px;font-size:17px" data-a="g" data-v="'+scr(i)+'">'+(S.done[i]?'Main lagi':'Mainkan')+'</button></div>').join('')+'</div>'},
+result(){const mx=MS.map((_,i)=>MX(i)),t=total(),M=mx.reduce((a,b)=>a+b,0),p=Math.min(1,t/M),n=p>=.85?3:p>=.6?2:1,L=['Calon developer, ayo coba lagi','Android Developer Junior','Android Developer Handal'][n-1];
+const KN=['Mengenali','Menyusun','Menganalisis'];
+const K=KN.map((nm,k)=>{let a=0,b=0;MS.forEach((d,i)=>{if(d.k==k){a+=S.sc[i];b+=mx[i]}});return[nm,b?a/b:0]}),lo=K.slice().sort((a,b)=>a[1]-b[1])[0][0];
+E('mn').innerHTML='<div class="row"><div class="card col" style="align-items:center;text-align:center;justify-content:center;gap:6px"><div style="font-size:56px;color:#F2B84B" aria-label="'+n+' bintang">'+'★'.repeat(n)+'☆'.repeat(3-n)+'</div><h2 style="margin:0">'+L+'</h2><p style="font-size:24px;margin:0">Skor total: <b>'+t+'</b> dari '+M+'</p>'+K.map(k=>'<div style="width:100%;text-align:left;font-size:17px">'+k[0]+'<div style="height:12px;background:#0b1620;border-radius:6px"><div style="height:12px;width:'+Math.round(Math.min(1,k[1])*100)+'%;background:#F2B84B;border-radius:6px"></div></div></div>').join('')+'<p style="font-size:18px;margin:4px 0">Saran: ulangi misi yang melatih kemampuan '+lo.toLowerCase()+'.</p><button class="pri" id="ag">Main lagi</button></div><div class="col"><div class="card"><h2 style="font-size:24px">Ringkasan pencapaian</h2><div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px">'+MS.map((m,i)=>'<div class="slot" style="padding:3px 0;font-size:15px">'+(i+1)+'. '+m.n+' <b style="float:right">'+S.sc[i]+'</b></div>').join('')+'</div></div><div class="card"><h2 style="font-size:22px">Refleksi</h2><p style="font-size:19px">Jika klien melapor aplikasi crash, apa yang pertama kali kamu lakukan dan mengapa?</p><textarea style="height:60px" aria-label="Jawaban refleksi"></textarea></div></div></div>';
+E('ag').onclick=()=>{S.done.fill(0);S.sc.fill(0);S.lv.fill(3);S.m.fill(null);go('menu')}},
+credit(){E('mn').innerHTML='<h2>Informasi kreator</h2><div class="card"><p>Kreator: [isi nama kreator, boleh disertai gelar]</p><p>Organisasi: [isi nama sekolah atau institusi]</p></div><div class="card" style="margin-top:14px"><p style="font-size:20px">Aset: seluruh ilustrasi berupa grafik vektor (SVG) yang dibuat oleh pengembang. Bunyi umpan balik dihasilkan oleh Web Audio API. Tidak ada aset atau tautan eksternal.</p></div>'}
+};
+
+/* ---------- mesin tantangan ---------- */
+function RM(i){({rg,od,dg,fl,sc,qz})[MS[i].ty](i)}
+
+function rg(i){const m=S.m[0]=S.m[0]||{sel:null,ok:[]};
+const G=[['run',0,0,560,40],['pr',0,44,120,166],['ed',124,44,300,166],['dm',428,44,132,166],['lg',0,214,560,86]];
+const svg=G.map(([k,x,y,w,h])=>'<g class="reg '+(m.ok.includes(k)?'ok':'')+' '+(m.sel==k?'sel':'')+'" data-a="k1" data-v="'+k+'" tabindex="0" role="button" aria-label="Bagian jendela"><rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="8"/><text x="'+(x+w/2)+'" y="'+(y+h/2+7)+'" text-anchor="middle" font-size="'+(k=='dm'?15:20)+'">'+(m.ok.includes(k)?P.find(p=>p[2]==k)[0]:'?')+'</text></g>').join('');
+E('mn').innerHTML='<h2>Misi 1: Kenali ruang kerjamu</h2><p>Klik satu bagian di jendela Android Studio, lalu pilih fungsinya.</p><div class="row"><svg viewBox="0 0 560 300" width="600" height="321" role="img" aria-label="Denah jendela Android Studio">'+svg+'</svg><div class="col" style="gap:8px">'+PERM.map(k=>{const d=m.ok.includes(P[k][2]);return '<button data-a="d1" data-v="'+k+'" class="'+(d?'ok':'')+'" '+(d?'disabled':'')+'>'+P[k][1]+'</button>'}).join('')+'</div></div><div id="fb">Pilih dulu salah satu bagian jendela.</div>'}
+
+function od(i){const d=MS[i],m=S.m[i]=S.m[i]||{n:0};
+E('mn').innerHTML='<h2>Misi '+(i+1)+': '+d.h+'</h2><p>'+d.p+'</p><div class="row"><div class="col" style="gap:8px">'+d.sh.map(k=>'<button data-a="so" data-v="'+k+'" class="'+(k<m.n?'ok':'')+'" '+(k<m.n?'disabled':'')+'>'+d.st[k]+'</button>').join('')+'</div><div class="card col" style="gap:0">'+d.st.map((s,k)=>'<div class="slot">'+(k+1)+'. '+(k<m.n?s:'…')+'</div>').join('')+'</div></div><div id="fb">'+d.f+'</div>'}
+
+function dg(i){const d=MS[i],m=S.m[i]=S.m[i]||{ok:[],sel:null};
+const L=d.sh.map(k=>'<button draggable="true" data-a="c3" data-v="'+k+'" class="'+(m.ok.includes(k)?'ok':(m.sel===k?'pri':''))+'" '+(m.ok.includes(k)?'disabled':'')+'>'+d.it[k]+'</button>').join('');
+const T=d.tg.map((s,k)=>{const o=m.ok.includes(k);return '<div data-a="t3" data-v="'+k+'" tabindex="0" role="button" aria-label="'+s+'" style="border:2px dashed '+(o?'#1F7A52':(d.ph?'#5a7a98':'#8fb0cc'))+';border-radius:8px;padding:8px 12px;min-height:58px;cursor:pointer;display:flex;align-items:center">'+(o?(d.ph?d.pv[k]:'<span style="font-size:18px"><b style="color:#F2B84B">'+d.it[k]+'</b> – '+s+'</span>'):'<span style="font-size:18px">'+s+'</span>')+'</div>'}).join('');
+E('mn').innerHTML='<h2>Misi '+(i+1)+': '+d.h+'</h2><p>'+d.p+'</p><div class="row"><div class="col" style="max-width:300px;gap:8px">'+L+'</div><div class="card" style="flex:1;'+(d.ph?'background:#fff;color:#12263A;':'')+'display:flex;flex-direction:column;gap:8px;padding:12px 18px">'+T+'</div></div><div id="fb">Pilih satu item dulu.</div>'}
+
+function fl(i){const d=MS[i],m=S.m[i]=S.m[i]||{n:0};
+const b=k=>'<span style="display:inline-block;min-width:150px;padding:0 8px;border-radius:6px;text-align:center;line-height:1.5;background:'+(k<m.n?'#1F7A52':(k==m.n?'#F2B84B':'#0b1620'))+';color:'+(k==m.n?'#12263A':'#fff')+';border:1px dashed #8fb0cc">'+(k<m.n?d.an[k]:'____')+'</span>';
+const ln=d.ln.replace(/\{(\d)\}/g,(x,k)=>b(+k));
+E('mn').innerHTML='<h2>Misi '+(i+1)+': '+d.h+'</h2><p>'+d.p+'</p><div class="card" style="font-family:Consolas,monospace;font-size:19px;line-height:1.8">'+ln+'</div><p style="margin-top:10px;font-size:19px;max-width:1100px">'+d.nt+'</p><div style="display:flex;flex-wrap:wrap;gap:8px">'+d.bk.map(w=>'<button data-a="w4" data-v="'+w+'">'+w+'</button>').join('')+'</div><div id="fb">Pilih kata untuk bagian kosong pertama.</div>'}
+
+function sc(i){const d=MS[i],m=S.m[i]=S.m[i]||{q:0,t:90,w:0,d:0};
+if(m.d&&m.q<d.cs.length-1){m.q++;m.d=0;m.w=0}
+if(d.tm&&!TI&&!S.done[i])TI=setInterval(()=>{if(m.t>0)m.t--;const x=E('tm');if(x)x.textContent=m.t},1000);
+const c=d.cs[m.q];
+E('mn').innerHTML='<h2>Misi '+(i+1)+': '+d.h+'</h2><div style="display:flex;justify-content:space-between;font-size:22px;margin-bottom:8px"><span>Kasus '+(m.q+1)+' dari '+d.cs.length+'</span>'+(d.tm?'<span>Sisa waktu bonus: <b id="tm">'+m.t+'</b> detik</span>':'<span></span>')+'</div><div class="card"><p style="margin:0">'+c.q+'</p></div><div class="col" style="margin-top:12px;gap:8px">'+c.o.map((o,k)=>'<button data-a="oc" data-v="'+k+'">'+o+'</button>').join('')+'</div><div id="fb">Pilih tindakan yang paling tepat.</div>'}
+
+function qz(i){const m=S.m[i]=S.m[i]||{q:0,a:0,set:D.map((x,k)=>k).sort(()=>Math.random()-.5).slice(0,5)};
+if(m.a&&m.q<4){m.q++;m.a=0}
+const c=D[m.set[m.q]];
+E('mn').innerHTML='<h2>Demo ke klien</h2><div style="font-size:22px;margin-bottom:8px">Soal '+(m.q+1)+' dari 5</div><div class="card"><p style="margin:0">'+c.q+'</p></div><div class="col" style="margin-top:12px;gap:8px">'+c.o.map((o,k)=>'<button data-a="o6" data-v="'+k+'">'+o+'</button>').join('')+'</div><div id="fb">Pilih jawaban yang paling tepat.</div>'}
+
+/* ---------- aksi ---------- */
+const A={
+g:v=>{const i=idx(v);if(S.done[i]){S.done[i]=0;S.sc[i]=0;S.lv[i]=3;S.m[i]=null}go(v)},
+k1(k){const m=S.m[0];if(m.ok.includes(k))return;m.sel=k;rg(0);fb('Bagian dipilih. Sekarang pilih fungsinya.')},
+d1(v){const m=S.m[0];v=+v;if(!m.sel){fb('Klik dulu salah satu bagian jendela.','bad');return}
+ if(P[v][2]==m.sel){m.ok.push(m.sel);m.sel=null;S.sc[0]+=100;snd(1);rg(0);hud();
+  if(m.ok.length==5){S.done[0]=1;nav();fb('Misi 1 selesai! Kamu sudah mengenal ruang kerjamu. +100','ok')}else fb('Benar! '+P[v][0]+': '+P[v][1]+'. +100','ok')}
+ else{lose(0);fb('Belum tepat. Petunjuk: '+P.find(p=>p[2]==m.sel)[3],'bad')}},
+so(v){const i=cur(),d=MS[i],m=S.m[i];v=+v;
+ if(v==m.n){m.n++;S.sc[i]+=100;snd(1);od(i);hud();
+  if(m.n==d.st.length){S.done[i]=1;nav();fb('Misi '+(i+1)+' selesai! '+d.fin+' '+d.ex[v]+' +100','ok')}else fb('Tepat! '+d.ex[v]+' +100','ok')}
+ else{lose(i);fb('Belum urutan itu. Tanyakan: apa yang harus siap sebelum langkah ini?','bad')}},
+c3(v){const i=cur(),d=MS[i],m=S.m[i];v=+v;if(m.ok.includes(v))return;m.sel=v;dg(i);fb('"'+d.it[v]+'" dipilih. Sekarang pilih tempatnya.')},
+t3(v){const i=cur(),d=MS[i],m=S.m[i];v=+v;
+ if(m.sel==null){fb('Pilih dulu item yang akan dicocokkan.','bad');return}
+ if(m.ok.includes(v))return;
+ if(m.sel==v){m.ok.push(v);m.sel=null;S.sc[i]+=100;snd(1);dg(i);hud();
+  if(m.ok.length==d.it.length){S.done[i]=1;nav();fb('Misi '+(i+1)+' selesai! '+d.fin+' +100','ok')}else fb('Tepat! Item itu cocok dengan tempatnya. +100','ok')}
+ else{lose(i);fb('Belum cocok. Petunjuk: '+d.hn[v],'bad')}},
+w4(v){const i=cur(),d=MS[i],m=S.m[i];if(S.done[i])return;
+ if(v==d.an[m.n]){m.n++;S.sc[i]+=100;snd(1);fl(i);hud();
+  if(m.n==d.an.length){S.done[i]=1;nav();fb('Misi '+(i+1)+' selesai! '+d.fin+' +100','ok')}else fb('Tepat! '+d.ex[m.n-1]+' +100','ok')}
+ else{lose(i);fb('Belum tepat. Baca lagi keterangan di bawah kode dan perhatikan ejaan persis.','bad')}},
+oc(v){const i=cur(),d=MS[i],m=S.m[i],c=d.cs[m.q],bs=document.querySelectorAll('[data-a=oc]');v=+v;if(S.done[i]||m.d)return;
+ if(v==c.a){m.d=1;const pts=m.w?50:100;S.sc[i]+=pts;snd(1);bs.forEach((b,k)=>{b.disabled=true;if(k==v)b.classList.add('ok')});
+  if(m.q==d.cs.length-1){let bn=0;if(d.tm){stopT();bn=m.t*2;S.sc[i]+=bn}S.done[i]=1;nav();fb(c.e+' +'+pts+'. Misi '+(i+1)+' selesai!'+(d.tm?' Bonus waktu +'+bn:''),'ok')}
+  else{fb(c.e+' +'+pts,'ok');E('mn').insertAdjacentHTML('beforeend','<button class="pri" style="margin-top:10px" data-a="nc">Kasus berikutnya</button>')}
+  hud()}
+ else{m.w=1;bs[v].disabled=true;bs[v].classList.add('bad');lose(i);fb('Belum tepat. Pikirkan lagi penyebab masalah sebelum bertindak. Coba pilihan lain.','bad')}},
+nc(){const i=cur(),m=S.m[i];m.q++;m.w=0;m.d=0;sc(i)},
+o6(v){const i=LAST,m=S.m[i],c=D[m.set[m.q]],bs=document.querySelectorAll('[data-a=o6]');v=+v;if(m.a)return;m.a=1;
+ bs.forEach((b,k)=>{b.disabled=true;if(k==c.a)b.classList.add('ok');else if(k==v)b.classList.add('bad')});
+ if(v==c.a){S.sc[i]+=100;snd(1);fb('Benar! '+c.e+' +100','ok')}else{snd(0);fb('Belum tepat. '+c.e,'bad')}
+ hud();
+ if(m.q==4){S.done[i]=1;nav();fb(E('fb').textContent+' Demo selesai!',E('fb').className)}
+ else E('mn').insertAdjacentHTML('beforeend','<button class="pri" style="margin-top:10px" data-a="n6">Soal berikutnya</button>')},
+n6(){const m=S.m[LAST];m.q++;m.a=0;qz(LAST)}
+};
+E('mn').onclick=e=>{const t=e.target.closest('[data-a]');if(t&&!t.disabled)A[t.dataset.a](t.dataset.v)};
+E('mn').onkeydown=e=>{if(e.key=='Enter'||e.key==' '){const t=e.target.closest('g[data-a],div[role=button][data-a]');if(t){e.preventDefault();A[t.dataset.a](t.dataset.v)}}};
+E('mn').addEventListener('dragstart',e=>{const t=e.target.closest('[data-a=c3]');if(t){e.dataTransfer.setData('text/plain',t.dataset.v);const m=S.m[cur()];if(m)m.sel=+t.dataset.v}});
+E('mn').addEventListener('dragover',e=>{if(e.target.closest('[data-a=t3]'))e.preventDefault()});
+E('mn').addEventListener('drop',e=>{const t=e.target.closest('[data-a=t3]');if(t){e.preventDefault();A.t3(t.dataset.v)}});
+function fit(){const s=Math.min(innerWidth/1280,innerHeight/720);E('stage').style.transform='translate('+(-640*s)+'px,'+(-360*s)+'px) scale('+s+')'}
+addEventListener('resize',fit);fit();go('cover');
+</script></body></html>
